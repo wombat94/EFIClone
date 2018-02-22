@@ -1,6 +1,6 @@
 # EFIClone
 macOS Shell Scripts to clone the EFI partition automatically from either Carbon Copy Cloner or SuperDuper! when run on a Hackintosh
-
+Test
 It is a standard bash script and it uses only standard macOS installed commands.
 
 You configure this script as a "post flight" script in your CCC Task. To access this, you click on "Advanced Settings" and scroll down to the "AFTER COPYING FILES" section. The first setting in that section is "Run a Shell Script:". Click on the folder and choose the cccEFIClone.sh file.
