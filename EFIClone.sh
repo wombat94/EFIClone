@@ -242,37 +242,37 @@ else
 	writeTolog "destination EFI partition cleared"
 	writeTolog "Copying all files from $sourceEFIMountPoint/EFI to $destinationEFIMountPoint. Details follow..."
 	writeTolog "--------------------------------------------------------------------"
-	cp -R -apv "$sourceEFIMountPoint/EFI" "$destinationEFIMountPoint/" >> ${LOG_FILE} 
+	cp -R -apv "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE} 
 	writeTolog "--------------------------------------------------------------------"
 	writeTolog "Contents of Source EFI Partition copied to Destination EFI Partition"
 fi 
-writeTolog "Compare the checksums of the EFI directories on the source and destination partitions"
-writeTolog "-------------------------------------------------------------------------------------"
-pushd "$sourceEFIMountPoint/EFI"
-sourceEFIHash="$( getEFIDirectoryHash "$sourceEFIMountPoint/EFI" )"
-popd
-pushd "$destinationEFIMountPoint/EFI"
-destinationEFIHash="$( getEFIDirectoryHash "$destinationEFIMountPoint/EFI" )"
-popd
-writeTolog "Source directory hash: $sourceEFIHash"
-writeTolog "Destination directory hash: $destinationEFIHash"
-if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
-then
-	writeTolog "Directory hashes match! file copy successful"
-else
-	writeTolog "Directory hashes differ! file copy unsuccessful"
-fi 
-writeTolog "-------------------------------------------------------------------------------------"
+#writeTolog "Compare the checksums of the EFI directories on the source and destination partitions"
+#writeTolog "-------------------------------------------------------------------------------------"
+#pushd "$sourceEFIMountPoint/"
+#sourceEFIHash="$( getEFIDirectoryHash "$sourceEFIMountPoint/EFI" )"
+#popd
+#pushd "$destinationEFIMountPoint/"
+#destinationEFIHash="$( getEFIDirectoryHash "$destinationEFIMountPoint/EFI" )"
+#popd
+#writeTolog "Source directory hash: $sourceEFIHash"
+#writeTolog "Destination directory hash: $destinationEFIHash"
+#if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+#then
+#	writeTolog "Directory hashes match! file copy successful"
+#else
+#	writeTolog "Directory hashes differ! file copy unsuccessful"
+#fi 
+#writeTolog "-------------------------------------------------------------------------------------"
 diskutil unmount /dev/$destinationEFIPartition
 diskutil unmount /dev/$sourceEFIPartition
 writeTolog "EFI Partitions Unmounted"
-writeTolog "cccEFIClone.sh complete"
-if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
-then
+writeTolog "EFIClone.sh complete"
+#if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+#then
 	osascript -e 'display notification "EFI Clone Script completed successfully." with title "EFI Clone Script"'
-else
-	osascript -e 'display notification "EFI Clone failed - destionation data did not match source after copy." with title "EFI Clone Scipt"'
-fi 
+#else
+#	osascript -e 'display notification "EFI Clone failed - destionation data did not match source after copy." with title "EFI Clone Scipt"'
+#fi 
 
 
 exit 0
