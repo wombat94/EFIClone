@@ -1,68 +1,74 @@
 # EFIClone
-macOS Shell Scripts to clone the EFI partition automatically from either Carbon Copy Cloner or SuperDuper! when run on a Hackintosh
-Test
-It is a standard bash script and it uses only standard macOS installed commands.
 
-You configure this script as a "post flight" script in your CCC Task. To access this, you click on "Advanced Settings" and scroll down to the "AFTER COPYING FILES" section. The first setting in that section is "Run a Shell Script:". Click on the folder and choose the cccEFIClone.sh file.
+EFIClone.sh is a macOS bash shell script for Hackintosh machines that is designed to integrate with either Carbon Copy Cloner or SuperDuper! - the two most popular macOS disk cloning utilities.
 
-That is all you need to do within CCC.
+CCC and SD! both will automatically create bootable clones on real Macintoshes in a single step. Though modern Macs support the EFI booting in order to maintain compatibility with running non-Apple operating system on their hardware, they do NOT need the EFI partition in order to boot MacOS. Because of this, the disk clone utilities do not copy the contents of the secondary EFI partition from one drive to another when doing their job.
 
-Within the script there are just two settings currently that are user editable - these are both at the top of the script.
+This is where EFIClone comes in.
 
-First is the LOG_FILE setting. This is the complete path to where the log will be written (including filename).
+Both CCC and SD! have the ability to configure a "post flight" script that will be launched when the main clone job has been completed.
 
-This does not HAVE to be edited but you can if you want. The default is to write the log to the working directory where the script is running from. On my system, at least, it appears that the working directory for the script is the root of the boot volume. If you want it to go elsewhere, feel free to change this setting.
+Both programs pass details of the source and destination drives that were used in the clone job, and from this the script is able to find the associated EFI partitions and automatically copy the contents of the critical EFI folder from the source drive to the destination drive as well.
 
-The second setting is called "TEST_SWITCH". This is a control switch so that you can run the script without making any data changes to your disks. It will parse and set all variables and log those settings to the log file so you can review them before turning the script loose to be run in anger. The script will always be distributed with this switch set to "Y". Any other setting that you change it to will mean that the script will run and will delete previous data in the Destination EFI partition and replace it with the copy from the Source EFI partition.
+The script provides extensive logging, has a "test" mode that will log what it WOULD have done but will not modify any data, and sends a notification to the macOS notification center with the results of the run.
 
-PLESAE BE SURE TO HAVE ANOTHER WORKING BACKUP OF YOUR SYSTEM BEFORE CHANGING THIS SETTING AND ALLOWING THE SCRIPT TO MODIFY YOUR DATA.
+When configured in your CCC or SD! clone job, EFIClone will allow you to do a single-step clone from your current hackintosh drive to a truly bootable backup drive with no other steps required.
 
-Standard disclaimers apply here... this script is provided without warranty and I take no responsibility for data loss you may incur. If it is configured to run through CCC it should only EVER modify data on a fresh backup volume, so it should not put your primary system in danger, but I've been a software developer for 20 years, so I know that what it "SHOULD" do and what it might do out in the wild are not always one and the same. Be careful. Be sure to test your backup to see that it works.
+---------------------
 
-Now... having all of that out of the way, here is a description of what the script does.
+SCRIPT CONFIGURATION
 
-At the end of each CCC clone task run, if you have a script configured, CCC launches the script and passes four parameters in to the script:
+There are currently only two user confiruation settings. 
 
-1. The source volume path that was cloned
-2. The destination volume path that received the clone
-3. An exit code indicating whether the CCC clone job completed successfully or not
-4. If the destination was a disk image (rather than an actual disk partition), the path and name of the image file is passed here, otherwise this parameter is blank.
+Since this is a script file, they have to be manually edited with a text editor.
 
-First, my script is instantiated, it first checks to see if the CCC clone task completed successfully. If it did not, the script exits
-Second, it checks the fourth parameter to see if it is populated. If there is ANYTHING in this parameter, that means the destination was a disk image - and the idea of copying to an EFI partition on an image doesn't make sense, so it exits
-Having passed those two initial checks, the script then uses diskutil info to get the disk that the partition corresponding to the volume path resides on for both the source and destination volumes
-It then tries to find an EFI partition on each of these disks in turn. If a simple check for an EFI partition on that disk number returns nothing, it will first check to see if the disk is a CoreStorage volume and then find the physical disk that the CoreStorage volume resides on and check THAT volume for an EFI partition.
-If the check for CoreStorage still does not return an EFI partition, it falls back to check for an APFS volume and the physical disk that THAT resides on.
-If we still are without a valid EFI partition for either source or destination after checking for physical disk, coreStorage and APFS, then we cannot proceed with the clone and the script exits.
-Finally, if EFI partitions were found for both source and destination partitions, we check to be sure that they are not both on the same disk. If that is the case, then something went very wrong and we can't clone onto the same drive itself, so the script will exit.
-Now with all of the preliminary setup out of the way, we are finally ready to take action. The script will then:
+The most important setting is the TEST_SWITCH.
 
-Mount the source EFI partition
-Mount the destination EFI partition
-Resolve the Mount Point of both of the above mounted partitions to ensure we are copying from and to the right locations. As long as they are mounted in order the source should be EFI and the destination should be EFI 1, but it is possible other EFI partitions were mounted already or that the Destination might still be mounted from previous user actions and it could be at the EFI mount point. The delete and copy commands are only ever executed using these system-resolved mount points - not the volume names.
-After the drives are mounted, the destination drive is cleared - a recursive rm command is issued to totally wipe the drive
-Next all files on the source are copied over to the destination drive
-Both of the above commands are run in "verbose" mode and all output is sent to the log file so there is a complete record of the actions of the script
-Finally, after the script is complete, both source and destination are unmounted and the script exits
+TEST_SWITCH="Y" (Default on a new install is "Y")
 
-So that is it in a nutshell.
+  - a value of "Y" tells the script to only test it's run - no modification of data will happen
+  - a value other than "Y" allows the script to run in normal mode - it will delete the contents of the destination EFI partition and
+      replace them with the contents of the source EFI partition.
 
-This is definitely a v0.1 beta. Most of this is very simple so it will not evolve too much, but there are a few things I already plan to work on...
+This setting tells the script whether to run in Test Mode. In Test Mode all parsing of the script input will take place, the EFI partitions will be mounted, the data on the source and destination partitions will be verified and all activity will be logged, but NO DATA WILL BE MODIFIED. This is a safety measure. Please run the script with TEST_SWITCH="Y" at least once and review the log file to see the results before attemtping to let the script modify anything. I use this script for myself and have no problems with it but is is brand new (beta) and it WILL delete the contents of what it believe is the EFI partiton on the destination drive. It is possible that something could be screwed up and I don't want to delete the wrong data. Regardless of what the test shows, I have to add this disclaimer: I AM NOT RESPONSIBLE FOR DATA LOSS ON YOUR SYSTEM. PLEASE ENSURE YOU HAVE A WORKING BACKUP BEFORE YOU ATTEMPT TO USE THIS SCRIPT. I HAVE DONE EVERYTHING I CAN TO PREVENT DATA LOSS, BUT THERE MAY BE BUGS IN THIS CODE. I PROVIDE NO WARRANTY ON THE SOFTWARE. USE AT YOUR OWN RISK.
 
-1. The logic to find the physical disk # or check the two virtual storage volume types for their physical disk works, but it is ugly. I do plan to refactor this to clean it up
-2. I don't really have any error handling or reporting. There are only two commands that take any physical action on your system and they are both pretty solid, but I would like to add/improve logging so that I can find issues as people start using it.
-3. There are already two use cases I can think of that I want to trap for and make additional exit points:
-If there happens to be more than one EFI partition on a physical disk, I want to detect that and disallow things to proceed. I don't want to guess at which EFI partition should be used if either of the drives happen to have this.
-I am considering doing a disk free space check to make sure there is room. I believe the EFI partition is a standard size dictated by the EFI spec, but that doesn't mean there couldn't be a drive that is "masquerading" as a true EFI volume.
-​
-I also have found that there is a way to raise a notification to the Notification Center from a shell script, so I am going to look into that to provide some affirmative feedback about the results, rather than relying on the user to review the log.
+The only other setting is the path where the log file will be written out.
 
-Please let me know how this goes and feel free to ask any questions.
+LOG_FILE="$PWD/EFIClone.log" (Default is the path to the working directory and a file named EFIClone.log)
 
-One area I am particularly interested in is testing with an APFS volume (either as a source or destination). I'm not running High Sierra on my hackintoshes yet - only on my real MacBook Pro, so I was able to code and test the detection logic, but can't test the overall script on a hack.
+There is no absolute need to change this setting, but if you want to force the log to be written elsewhere, you can put the full path in this setting.
 
-Enjoy!
+From what I can tell, both Carbon Copy Cloner and SuperDuper! run the script with a woking directory of the root of the boot drive "/". That is where it writes the log on my system every time. If you can't find the log, just search for it in SpotLight.
 
-I definitely will move this out to the Post Install/General forum, but want to have the script setup on GitHub first, and I won't get to that until this weekend.
 
-Ted
+INSTALLATION
+------------------------------------
+
+There really is nothing to "install". This is a simple shell script that relies ONLY on native macOS command line utilities to perform all of its functions.
+
+Download the file and place it anywhere on your system that is accessible.
+
+CLONE UTILITY CONFIGURATION
+------------------------------------
+
+The configuration of both utilities is similar, but not exact. See the following sections for each.
+
+Carbon Copy Cloner
+
+1. Create a Clone task as you normally would, defining the Source and Destination partitions.
+2. Click on the Advance Settings button, just below the Source partition.
+3. The advanced settings pane will open. If necessary scroll down until you can see the section labeled "AFTER COPYING FILES" and click on the folder icon next to "Run a Shell Script:"
+4. Use the file dialog to select EFIClone.sh from the folder where you placed it after downloading.
+5. After you have selected it, your task should look like this - with the script name "EFIClone.sh" showing next to the "Run a Shell Script:" line. If you want to you can click on the "eye" icon to see a read-only version of the script. If you need to change the script (or remove it completely) you can click on the "X" icon to deatch the script from your CCC Task.
+
+SuperDuper!
+
+1. Choose your Source and Destination partitions in the "Copy" and " to " drop down menus.
+2. Click on the "Options..." button
+3. This will display the "General" options tab. Click on "Advanced" to show the Advanced options.
+4. Check the box that says "Run shell script after copy completes" and click on "Choose..."
+5. Use the file dialog to select EFIClone.sh from the folder where you placed it after downloading.
+6. After you have selected it, the dialog should show the path to the script.
+
+Please report any bugs. Feel free to open issues for enhancements you would like to see.
+
