@@ -69,6 +69,10 @@ function getDiskMountPoint () {
 	echo "$( diskutil info "$1" | grep 'Mount Point' | rev | cut -d ':' -f 1 | rev | awk '{$1=$1;print}' )"
 }
 
+function getEFIDirectoryHash () {
+	echo "$( find -s . -type f -print0 | xargs -0 shasum | cut -d ' ' -f 1 | shasum  )"
+}
+
 #begin logging
 writeTolog "***** EFI Clone Script start"
 writeTolog "working directory = $PWD" 
@@ -93,6 +97,7 @@ then
 		writeTolog "CCC completed with success, the EFI Clone Script will run"
 	else
 		writeTolog "CCC did not exit with success, the EFI Clone Script will not run"
+		osascript -e 'display notification "CCC Task failed, EFI Clone Script did not run" with title "EFI Clone Script"'
 		exit 0
 	fi
 
@@ -101,6 +106,7 @@ then
 		writeTolog "CCC clone was not to a disk image. the EFI Clone Script will run"
 	else
 		writeTolog "CCC Clone destination was a disk image file. The EFI Clone Script will not run"
+		osascript -e 'display notification "CCC Clone destination was a disk image. Clone script did not run." with title "EFI Clone Script"'
 		exit 0
 	fi
  
@@ -126,6 +132,7 @@ else
 		#an unknown number of parameters have been passed in. log that fact and then exit
 		writeTolog "$# parameters were passed in. This is an unsupported number of parameters. Exiting now"
 		echo "$# parameters were passed in. This is an unsupported number of parameters. Exiting now"
+		osascript -e 'display notification "Unsupported set of parameters passed in. EFI Clone script did not run!" with title "EFI Clone Script"'
 		exit 0
 	fi 
 fi
@@ -192,18 +199,21 @@ writeTolog destinationEFIPartition = $destinationEFIPartition
 if [[ "$sourceEFIPartition" == "" ]]
 then
 	writeTolog "No SourceEFIPartition Found, script exiting."
+	osascript -e 'display notification "No source EFI Partition found. EFI Clone Script did not run!." with title "EFI Clone Script"'
 	exit 0
 fi 
 
 if [[ "$destinationEFIPartition" == "" ]]
 then
 	writeTolog "No DestinationEFIPartition Found, script exiting."
+	osascript -e 'display notification "No destination EFI Partition found. EFI Clone Script did not run!." with title "EFI Clone Script"'
 	exit 0
 fi
 
 if [[ "$sourceEFIPartition" == "$destinationEFIPartition" ]]
 then
 	writeTolog "Source and Destination EFI Partitions are the same. Script exiting."
+	osascript -e 'display notification "Source and Destination EFI partitions are the same. EFI Clone Script did not run!." with title "EFI Clone Script"'
 	exit 0
 fi
 
@@ -227,7 +237,7 @@ then
 else 
 	writeTolog "Clearing all files from $destinationEFIMountPoint. Details follow..."
 	writeTolog "--------------------------------------------------------------------"
-	rm -drfv "$destinationEFIMountPoint/EFI" >> /Users/tedhowe/Documents/ccc.txt >> ${LOG_FILE} 
+	rm -drfv "$destinationEFIMountPoint/EFI" >> ${LOG_FILE} 
 	writeTolog "--------------------------------------------------------------------"
 	writeTolog "destination EFI partition cleared"
 	writeTolog "Copying all files from $sourceEFIMountPoint/EFI to $destinationEFIMountPoint. Details follow..."
@@ -236,8 +246,33 @@ else
 	writeTolog "--------------------------------------------------------------------"
 	writeTolog "Contents of Source EFI Partition copied to Destination EFI Partition"
 fi 
+writeTolog "Compare the checksums of the EFI directories on the source and destination partitions"
+writeTolog "-------------------------------------------------------------------------------------"
+pushd "$sourceEFIMountPoint/EFI"
+sourceEFIHash="$( getEFIDirectoryHash "$sourceEFIMountPoint/EFI" )"
+popd
+pushd "$destinationEFIMountPoint/EFI"
+destinationEFIHash="$( getEFIDirectoryHash "$destinationEFIMountPoint/EFI" )"
+popd
+writeTolog "Source directory hash: $sourceEFIHash"
+writeTolog "Destination directory hash: $destinationEFIHash"
+if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+then
+	writeTolog "Directory hashes match! file copy successful"
+else
+	writeTolog "Directory hashes differ! file copy unsuccessful"
+fi 
+writeTolog "-------------------------------------------------------------------------------------"
 diskutil unmount /dev/$destinationEFIPartition
 diskutil unmount /dev/$sourceEFIPartition
 writeTolog "EFI Partitions Unmounted"
 writeTolog "cccEFIClone.sh complete"
+if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+then
+	osascript -e 'display notification "EFI Clone Script completed successfully." with title "EFI Clone Script"'
+else
+	osascript -e 'display notification "EFI Clone failed - destionation data did not match source after copy." with title "EFI Clone Scipt"'
+fi 
+
+
 exit 0
