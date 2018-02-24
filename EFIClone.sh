@@ -9,8 +9,13 @@
 # version 0.1beta2
 # 2/23/2018
 # Clean up and combine.
-# Combined the two versions of the script into a single script that detects whether it was called from
-# Carbon Copy Cloner or SuperDuper! and behaves accordingly in the setup. 
+# -Combined the two versions of the script into a single script that detects whether it was called from
+#      Carbon Copy Cloner or SuperDuper! and behaves accordingly in the setup. 
+# -Added validation of the copied data through SHASUM hashing of all visible files in the source and 
+#      destination EFI partitions after the delete/rsync copy is complete
+# -Changed the method of copying files from cp to rsync
+# -Modified the copy path of the source to include the root directory - not just the /EFI/ directory 
+#      and subdirectories.
 #----------------------------------------------------------------------------------------------------------
 # version 0.1beta1
 # 2/22/2018
@@ -70,8 +75,15 @@ function getDiskMountPoint () {
 }
 
 function getEFIDirectoryHash () {
-	echo "$( find -s . -type f -print0 | xargs -0 shasum | cut -d ' ' -f 1 | shasum  )"
+	#echo "$( find -s . -type f \( ! -iname ".*" \) -print0 | xargs -0 shasum | cut -d ' ' -f 1 | shasum  )"
+	echo "$( find -s . -not -path '*/\.*' -type f \( ! -iname ".*" \) -print0 | xargs -0 shasum | shasum )"
 }
+
+function logEFIDirectoryHashDetails () {
+	#echo "$( find -s . -type f \( ! -iname ".*" \) -print0 | xargs -0 shasum | cut -d ' ' -f 1 | shasum  )"
+	echo "$( find -s . -not -path '*/\.*' -type f \( ! -iname ".*" \) -print0 | xargs -0 shasum )" >> ${LOG_FILE}
+}
+
 
 #begin logging
 writeTolog "***** EFI Clone Script start"
@@ -232,7 +244,7 @@ then
 	writeTolog "File delete command calculated would have been..."
 	writeTolog "rm -drfv "$destinationEFIMountPoint"/EFI"
 	writeTolog "File copy command calculated would have been..."
-	writeTolog "cp -R -apv "$sourceEFIMountPoint"/EFI "$destinationEFIMountPoint"/"
+	writeTolog "rsync -av --exclude='.*'' "$sourceEFIMountPoint/" "$destinationEFIMountPoint/""
 	writeTolog "********* Test Simulation - end of file delete/copy section."
 else 
 	writeTolog "Clearing all files from $destinationEFIMountPoint. Details follow..."
@@ -242,37 +254,40 @@ else
 	writeTolog "destination EFI partition cleared"
 	writeTolog "Copying all files from $sourceEFIMountPoint/EFI to $destinationEFIMountPoint. Details follow..."
 	writeTolog "--------------------------------------------------------------------"
-	cp -R -apv "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE} 
+	rsync -av --exclude=".*" "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE}
 	writeTolog "--------------------------------------------------------------------"
 	writeTolog "Contents of Source EFI Partition copied to Destination EFI Partition"
 fi 
-#writeTolog "Compare the checksums of the EFI directories on the source and destination partitions"
-#writeTolog "-------------------------------------------------------------------------------------"
-#pushd "$sourceEFIMountPoint/"
-#sourceEFIHash="$( getEFIDirectoryHash "$sourceEFIMountPoint/EFI" )"
-#popd
-#pushd "$destinationEFIMountPoint/"
-#destinationEFIHash="$( getEFIDirectoryHash "$destinationEFIMountPoint/EFI" )"
-#popd
-#writeTolog "Source directory hash: $sourceEFIHash"
-#writeTolog "Destination directory hash: $destinationEFIHash"
-#if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
-#then
-#	writeTolog "Directory hashes match! file copy successful"
-#else
-#	writeTolog "Directory hashes differ! file copy unsuccessful"
-#fi 
-#writeTolog "-------------------------------------------------------------------------------------"
+writeTolog "Compare the checksums of the EFI directories on the source and destination partitions"
+writeTolog "-------------------------------------------------------------------------------------"
+pushd "$sourceEFIMountPoint/"
+sourceEFIHash="$( getEFIDirectoryHash "$sourceEFIMountPoint/EFI" )"
+writeTolog "Source directory hash: $sourceEFIHash"
+temp="$( logEFIDirectoryHashDetails "$sourceEFIMountPoint" )"
+popd
+pushd "$destinationEFIMountPoint/"
+destinationEFIHash="$( getEFIDirectoryHash "$destinationEFIMountPoint/EFI" )"
+writeTolog "Destination directory hash: $destinationEFIHash"
+temp="$( logEFIDirectoryHashDetails "$sourceEFIMountPoint" )"
+popd
+
+if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+then
+	writeTolog "Directory hashes match! file copy successful"
+else
+	writeTolog "Directory hashes differ! file copy unsuccessful"
+fi 
+writeTolog "-------------------------------------------------------------------------------------"
 diskutil unmount /dev/$destinationEFIPartition
 diskutil unmount /dev/$sourceEFIPartition
 writeTolog "EFI Partitions Unmounted"
 writeTolog "EFIClone.sh complete"
-#if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
-#then
+if [[ "$sourceEFIHash" == "$destinationEFIHash" ]]
+then
 	osascript -e 'display notification "EFI Clone Script completed successfully." with title "EFI Clone Script"'
-#else
-#	osascript -e 'display notification "EFI Clone failed - destionation data did not match source after copy." with title "EFI Clone Scipt"'
-#fi 
+else
+	osascript -e 'display notification "EFI Clone failed - destionation data did not match source after copy." with title "EFI Clone Scipt"'
+fi 
 
 
 exit 0
