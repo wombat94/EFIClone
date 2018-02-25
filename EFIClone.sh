@@ -5,7 +5,12 @@
 # wombat94 on TonyMacx86 forums and GitHub.
 
 #Release Notes
-#
+# version 0.1beta3
+# 2/24/2018
+# - Updated to use rsync to handle the deletion of information from the desination drive. Basically,
+#   allow rsync to do its thing
+# - Added additional check, based on clover boot log retrieved with bdmesg, to ensure that the 
+#   destination EFI partition is NOT the EFI partition that was used to boot the computer. 
 # version 0.1beta2
 # 2/23/2018
 # Clean up and combine.
@@ -84,6 +89,22 @@ function logEFIDirectoryHashDetails () {
 	echo "$( find -s . -not -path '*/\.*' -type f \( ! -iname ".*" \) -print0 | xargs -0 shasum )" >> ${LOG_FILE}
 }
 
+function getSystemBootVolumeName () {
+	echo "$( system_profiler SPSoftwareDataType | grep 'Boot Volume' | rev | cut -d ':' -f 1 | rev | awk '{$1=$1;print}' )"
+}
+
+function getCurrentBootEFIVolumeUUID () {
+	echo "$( bdmesg | grep 'SelfDevicePath' | rev | cut -d ')' -f 2 | rev | cut -d ',' -f 3 )"
+}
+
+function getDeviceIDfromUUID () {
+	echo "$( diskutil info "$1" | grep 'Device Identifier' | rev | cut -d ' ' -f 1 | rev )"
+}
+
+function getDiskIDfromUUID () {
+	writeTolog "$1"
+	echo "$( diskutil info "$1" | grep 'Device Identifier' | rev | cut -d ' ' -f 1 | rev )"
+}
 
 #begin logging
 writeTolog "***** EFI Clone Script start"
@@ -208,6 +229,16 @@ fi
 
 writeTolog destinationEFIPartition = $destinationEFIPartition 
 
+efiBootPartitionUUID="$( getCurrentBootEFIVolumeUUID )"
+writeTolog "efiBootPartitionUUID = $efiBootPartitionUUID"
+efiBootPartionDisk="$( getDeviceIDfromUUID "$efiBootPartitionUUID" )"
+writeTolog "efiBootPartitionDisk = $efiBootPartionDisk"
+if [[ "$efiBootPartitionDisk" == "$destinationDisk" ]]
+then
+	writeTolog "Destination disk is the current EFI partition that was used to boot the computer, script exiting."
+	osascript -e 'display notification "No source EFI Partition found. EFI Clone Script did not run!." with title "EFI Clone Script"'
+fi 
+
 if [[ "$sourceEFIPartition" == "" ]]
 then
 	writeTolog "No SourceEFIPartition Found, script exiting."
@@ -241,20 +272,17 @@ writeTolog destinationEFIMountPoint = $destinationEFIMountPoint
 if [[ "$TEST_SWITCH" == "Y" ]]
 then
 	writeTolog "********* Test simulation - file delete/copy would happen here. "
-	writeTolog "File delete command calculated would have been..."
-	writeTolog "rm -drfv "$destinationEFIMountPoint"/EFI"
-	writeTolog "File copy command calculated would have been..."
+	writeTolog "rsync command will be executed with the --dry-run option"
+	writeTolog "rsync command calculated is..."
 	writeTolog "rsync -av --exclude='.*'' "$sourceEFIMountPoint/" "$destinationEFIMountPoint/""
+	writeTolog "THE BELOW OUTPUT IS FROM AN RSYNC DRY RUN! NO DATA HAS BEEN MODIFIED!"
+	rsync --dry-run -av --exclude=".*" --delete "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE} 
 	writeTolog "********* Test Simulation - end of file delete/copy section."
 else 
-	writeTolog "Clearing all files from $destinationEFIMountPoint. Details follow..."
+	writeTolog "Synchronizing all files with rsync --delete option"
+	writeTolog "from $sourceEFIMountPoint/EFI to $destinationEFIMountPoint. Details follow..."
 	writeTolog "--------------------------------------------------------------------"
-	rm -drfv "$destinationEFIMountPoint/EFI" >> ${LOG_FILE} 
-	writeTolog "--------------------------------------------------------------------"
-	writeTolog "destination EFI partition cleared"
-	writeTolog "Copying all files from $sourceEFIMountPoint/EFI to $destinationEFIMountPoint. Details follow..."
-	writeTolog "--------------------------------------------------------------------"
-	rsync -av --exclude=".*" "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE}
+	rsync -av --exclude=".*" --delete "$sourceEFIMountPoint/" "$destinationEFIMountPoint/" >> ${LOG_FILE}
 	writeTolog "--------------------------------------------------------------------"
 	writeTolog "Contents of Source EFI Partition copied to Destination EFI Partition"
 fi 
