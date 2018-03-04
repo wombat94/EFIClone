@@ -88,7 +88,7 @@ function getSystemBootVolumeName () {
 }
 
 function getCurrentBootEFIVolumeUUID () {
-	echo "$( bdmesg | grep 'SelfDevicePath' | rev | cut -d ')' -f 2 | rev | cut -d ',' -f 3 )"
+	echo "$( /usr/local/bin/bdmesg | grep 'SelfDevicePath' | rev | cut -d ')' -f 2 | rev | cut -d ',' -f 3 )"
 }
 
 function getDeviceIDfromUUID () {
@@ -104,7 +104,6 @@ function getDiskIDfromUUID () {
 writeTolog "***** EFI SystemRestore_Backup script start"
 writeTolog "working directory = $PWD" 
 writeTolog "Running $0" 
-
 efiBootPartitionUUID="$( getCurrentBootEFIVolumeUUID )"
 writeTolog "efiBootPartitionUUID = $efiBootPartitionUUID"
 efiBootPartionDisk="$( getDeviceIDfromUUID "$efiBootPartitionUUID" )"
